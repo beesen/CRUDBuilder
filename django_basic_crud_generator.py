@@ -1,18 +1,18 @@
 """ Django Basic CRUD Generator """
-import os
 import codecs
-import string
+import os
 import re
-import pathlib
+
 from argumentParser import argument_parser
+from create_model_views import create_model_views
 
 
 def camel_case_to_underscore(name):
     """
     This function camel_case_to_underscores a Camel Case word to a underscore word
     """
-    temp = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
-    return re.sub('([a-z0-9])([A-Z])', r'\1_\2', temp).lower()
+    temp = re.sub('(.)([A-Z][a-z]+)', r'/1_/2', name)
+    return re.sub('([a-z0-9])([A-Z])', r'/1_/2', temp).lower()
 
 
 def is_file(file_name):
@@ -73,6 +73,7 @@ def open_or_create_file(file):
         print("%s created" % file)
         return codecs.open(file, 'w+')
 
+
 def parse_line(line):
     """
     Example line format => code = models.CharField(unique=True, max_length=15)
@@ -87,18 +88,23 @@ def parse_line(line):
         "field_type": field_type
     }
 
+
 def parse_model(lines, model_name):
-    """ Parse lines and return dict of fields """
+    """
+    Parse lines and return dict of fields
+    """
 
     # Find line with model(models.Model)
-    for line in lines:
+    for i in range(len(lines)):
+        line = lines[i]
         x = line.find(f'{model_name}(models.Model')
         if x > 0:
             break
 
     # Loop over lines with fields
     fields = []
-    for line in lines[x-1:]:
+    for i in range(i + 1, len(lines)):
+        line = lines[i]
         y = line.find('models.')
         if y > 0:
             fields.append(parse_line(line))
@@ -106,14 +112,41 @@ def parse_model(lines, model_name):
             break
     return fields
 
-def get_model(file, model_name):
+
+def get_model_fields(file, model_name):
     lines = read_file(file)
     return parse_model(lines, model_name)
 
-def execute_from_command_line():
 
+def create_model_urls(app_name, model_name):
+    """
+    Create url.py in current directory
+    """
+    file = open_or_create_file("urls.py")
+    file.write(f'from django.urls import path\n')
+    file.write(f'\n')
+    file.write(
+        f'from .views import {model_name}ListView, {model_name}CreateView, {model_name}UpdateView, {model_name}DeleteView, {model_name}DetailView\n')
+    file.write(f'\n')
+    file.write(f'app_name = "{app_name}"\n')
+    file.write(f'urlpatterns = [\n')
+    file.write(f'\tpath("", {model_name}ListView.asView(), name="list"),\n')
+    file.write(f'\tpath("create/", {model_name}CreateView.asView(), name="create"),\n')
+    file.write(
+        f'\tpath("<int:pk>/update/", {model_name}UpdateView.asView(), name="update"),\n')
+    file.write(
+        f'\tpath("<int:pk>/delete/", {model_name}DeleteView.asView(), name="delete"),\n')
+    file.write(
+        f'\tpath("<int:pk>/detail/", {model_name}DetailView.asView(), name="detail"),\n')
+    file.write(f']\n')
+    file.close()
+    return
+
+
+def execute_from_command_line():
     args = argument_parser()
     project_path = '/home/john/PycharmProjects/owb_forms/'
+    project_path = 'C:/Users/beesen/PycharmProjects/bhv/'
     app_name = args['app_name']
     model_name = args['model_name']
     # model_name_underscore = camel_case_to_underscore(model_name)
@@ -121,7 +154,14 @@ def execute_from_command_line():
     override_templates = args['override_templates']
 
     model_path = os.path.join(project_path, app_name, 'models.py')
-    model = get_fields(model_path, model_name)
+    model_fields = get_model_fields(model_path, model_name)
+    print(model_fields)
+
+    # create views.py
+    create_model_views(model_name, model_fields)
+
+    # create urls.py
+    create_model_urls(app_name, model_name)
 
     components = [
         "views",
@@ -140,6 +180,7 @@ def execute_from_command_line():
 
     # Create app folder with given app_name if there is no one
     create_folder_if_not(app_name)
+
 
 def __main__():
     # python - m django_basic_crud_generator --app_name MY_APP --model_name MY_MODEL
